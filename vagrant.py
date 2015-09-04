@@ -27,6 +27,10 @@ def getClients():
             c={}
             name, _, c['ansible_ssh_host'], _, c['ansible_ssh_port'] = clientVars
             clients[name] = c
+        elif len(clientVars) == 7:
+            c={}
+            name, _, c['ansible_ssh_host'], _, c['ansible_ssh_port'], _, c['ansible_ssh_private_key_file'] = clientVars
+            clients[name] = c
     return clients
 
 clients=getClients()
