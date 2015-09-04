@@ -8,6 +8,20 @@ import os
 import argparse
 import glob
 
+#===
+import os, sys, inspect
+
+cmd_subfolder = os.path.realpath(os.path.abspath(os.path.join(os.path.split(inspect.getfile( inspect.currentframe() ))[0],".ansible")))
+if cmd_subfolder not in sys.path:
+    sys.path.insert(0, cmd_subfolder)
+
+
+from ansible.inventory import Inventory
+from ansible.vars import VariableManager
+from ansible.parsing import DataLoader
+
+invetoryfile = '.vagrant/provisioners/ansible/inventory'
+
 parser = argparse.ArgumentParser(description='Process ansible inventory options')
 parser.add_argument("-l", "--list", action='store_true', help="list of groups" )
 parser.add_argument("-H", "--host", help="dictionary of variables for host")
@@ -17,37 +31,46 @@ args = parser.parse_args()
 def prettyprint(string):
     print json.dumps(string, indent=4, sort_keys=True)
 
+variable_manager = VariableManager()
+loader = DataLoader(vault_password=None)
 
-def getClients():
-    clientListString = os.popen("grep ssh .vagrant/provisioners/ansible/inventory/vagrant_ansible_inventory|tr '=' ' '").read()
-    clients = {}
-    for clientString in clientListString.split('\n'):
-        clientVars = clientString.split()
-        if len(clientVars) == 5:
-            c={}
-            name, _, c['ansible_ssh_host'], _, c['ansible_ssh_port'] = clientVars
-            clients[name] = c
-        elif len(clientVars) == 7:
-            c={}
-            name, _, c['ansible_ssh_host'], _, c['ansible_ssh_port'], _, c['ansible_ssh_private_key_file'] = clientVars
-            clients[name] = c
-    return clients
+inventory = Inventory(loader=loader, variable_manager=variable_manager, host_list=invetoryfile)
+variable_manager.set_inventory(inventory)
+# variable_manager.get_vars(loader=loader)
+#=====
 
-clients=getClients()
+def getHosts():
+    hosts = {}
+    for host in inventory.list_hosts():
+        vars = host.get_vars()
+        del vars['inventory_hostname'], vars['inventory_hostname_short']
+        hosts[host.name] = vars
+    return hosts
+
+
+def getGroups():
+    groups = {}
+    for group in inventory.get_groups():
+        if group.name not in ['all','ungrouped']:
+            groups[group.name] = [ host.name for host in group.get_hosts() ]
+    return groups
+
+hosts = getHosts()
+groups = getGroups()
+hostlist = {
+  "_meta" : {
+  "hostvars": hosts
+  }
+}
+hostlist.update(groups)
 
 if args.list:
-    hostlist = {
-      "_meta" : {
-      "hostvars": clients
-      },
-      "groupclients": clients.keys(),
-    }
     prettyprint(hostlist)
 
 elif args.host:
     try:
-        prettyprint( clients[args.host] )
+        prettyprint( hosts[args.host] )
     except:
         pass
 else:
-    prettyprint(clients)
+    prettyprint(hosts)
