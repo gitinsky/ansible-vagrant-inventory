@@ -15,10 +15,11 @@ cmd_subfolder = os.path.realpath(os.path.abspath(os.path.join(os.path.split(insp
 if cmd_subfolder not in sys.path:
     sys.path.insert(0, cmd_subfolder)
 
-
+from ansible import constants as C
 from ansible.inventory import Inventory
-from ansible.vars import VariableManager
-from ansible.parsing import DataLoader
+from ansible.vars import VariableManager 
+from ansible.parsing.dataloader import DataLoader
+print C.DEFAULT_VAULT_PASSWORD_FILE
 
 invetoryfile = '.vagrant/provisioners/ansible/inventory'
 
@@ -32,11 +33,12 @@ def prettyprint(string):
     print json.dumps(string, indent=4, sort_keys=True)
 
 variable_manager = VariableManager()
-loader = DataLoader(vault_password=None)
+loader = DataLoader()
+if C.DEFAULT_VAULT_PASSWORD_FILE:
+    loader.read_vault_password_file("/Users/hryamzik/sbin/vaultkeychain")
 
 inventory = Inventory(loader=loader, variable_manager=variable_manager, host_list=invetoryfile)
 variable_manager.set_inventory(inventory)
-# variable_manager.get_vars(loader=loader)
 #=====
 
 def getHosts():
@@ -47,12 +49,12 @@ def getHosts():
         hosts[host.name] = vars
     return hosts
 
-
 def getGroups():
     groups = {}
-    for group in inventory.get_groups():
-        if group.name not in ['all','ungrouped']:
-            groups[group.name] = [ host.name for host in group.get_hosts() ]
+    group_objects = inventory.get_groups()
+    for group_name in group_objects.keys():
+        if group_name not in ['all','ungrouped']:
+            groups[group_name] = [ host.name for host in group_objects[group_name].get_hosts() ]
     return groups
 
 hosts = getHosts()

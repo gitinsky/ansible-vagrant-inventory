@@ -17,20 +17,48 @@
 from __future__ import (absolute_import, division, print_function)
 __metaclass__ = type
 
-import StringIO
+from io import StringIO
 import os
-import codecs
-import ConfigParser
 import re
 
-from ansible.errors import *
+try:
+    # python2
+    import ConfigParser as configparser
+except ImportError:
+    # python3
+    import configparser
+
+from ansible.errors import AnsibleError
 from ansible.plugins.lookup import LookupBase
+
+
+def _parse_params(term):
+    '''Safely split parameter term to preserve spaces'''
+
+    keys = ['key', 'section', 'file', 're']
+    params = {}
+    for k in keys:
+        params[k] = ''
+
+    thiskey = 'key'
+    for idp,phrase in enumerate(term.split()):
+        for k in keys:
+            if ('%s=' % k) in phrase:
+                thiskey = k
+        if idp == 0 or not params[thiskey]:
+            params[thiskey] = phrase
+        else:
+            params[thiskey] += ' ' + phrase
+
+    rparams = [params[x] for x in keys if params[x]]
+    return rparams
+
 
 class LookupModule(LookupBase):
 
     def read_properties(self, filename, key, dflt, is_regexp):
-        config = StringIO.StringIO()
-        config.write('[java_properties]\n' + open(filename).read())
+        config = StringIO()
+        config.write(u'[java_properties]\n' + open(filename).read())
         config.seek(0, os.SEEK_SET)
         self.cp.readfp(config)
         return self.get_value(key, 'java_properties', dflt, is_regexp)
@@ -47,7 +75,7 @@ class LookupModule(LookupBase):
         # Retrieve a single value
         try:
             value = self.cp.get(section, key)
-        except ConfigParser.NoOptionError as e:
+        except configparser.NoOptionError:
             return dflt
         return value
 
@@ -55,11 +83,11 @@ class LookupModule(LookupBase):
 
         basedir = self.get_basedir(variables)
         self.basedir = basedir
-        self.cp      = ConfigParser.ConfigParser()
+        self.cp      = configparser.ConfigParser()
 
         ret = []
         for term in terms:
-            params = term.split()
+            params = _parse_params(term)
             key = params[0]
 
             paramvals = {
@@ -77,7 +105,7 @@ class LookupModule(LookupBase):
                     assert(name in paramvals)
                     paramvals[name] = value
             except (ValueError, AssertionError) as e:
-                raise errors.AnsibleError(e)
+                raise AnsibleError(e)
 
             path = self._loader.path_dwim_relative(basedir, 'files', paramvals['file'])
             if paramvals['type'] == "properties":

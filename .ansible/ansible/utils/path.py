@@ -18,15 +18,11 @@ from __future__ import (absolute_import, division, print_function)
 __metaclass__ = type
 
 import os
-import stat
-from time import sleep
 from errno import EEXIST
+from ansible.errors import AnsibleError
+from ansible.utils.unicode import to_bytes, to_str
 
-__all__ = ['is_executable', 'unfrackpath']
-
-def is_executable(path):
-    '''is the given path executable?'''
-    return (stat.S_IXUSR & os.stat(path)[stat.ST_MODE] or stat.S_IXGRP & os.stat(path)[stat.ST_MODE] or stat.S_IXOTH & os.stat(path)[stat.ST_MODE])
+__all__ = ['unfrackpath', 'makedirs_safe']
 
 def unfrackpath(path):
     '''
@@ -35,16 +31,18 @@ def unfrackpath(path):
     example:
     '$HOME/../../var/mail' becomes '/var/spool/mail'
     '''
-    return os.path.normpath(os.path.realpath(os.path.expandvars(os.path.expanduser(path))))
+    return os.path.normpath(os.path.realpath(os.path.expandvars(os.path.expanduser(to_bytes(path, errors='strict')))))
 
 def makedirs_safe(path, mode=None):
     '''Safe way to create dirs in muliprocess/thread environments'''
-    if not os.path.exists(path):
+
+    rpath = unfrackpath(path)
+    if not os.path.exists(rpath):
         try:
             if mode:
-                os.makedirs(path, mode)
+                os.makedirs(rpath, mode)
             else:
-                os.makedirs(path)
+                os.makedirs(rpath)
         except OSError as e:
             if e.errno != EEXIST:
-                raise
+                raise AnsibleError("Unable to create local directories(%s): %s" % (rpath, to_str(e)))
