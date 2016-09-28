@@ -34,7 +34,7 @@ def prettyprint(string):
 variable_manager = VariableManager()
 loader = DataLoader()
 if C.DEFAULT_VAULT_PASSWORD_FILE:
-    loader.read_vault_password_file("/Users/hryamzik/sbin/vaultkeychain")
+    loader.read_vault_password_file(C.DEFAULT_VAULT_PASSWORD_FILE)
 
 inventory = Inventory(loader=loader, variable_manager=variable_manager, host_list=invetoryfile)
 variable_manager.set_inventory(inventory)
